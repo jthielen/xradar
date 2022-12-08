@@ -79,5 +79,4 @@ msg2_additional_fmt = NamedStruct(
     'MSG_2_ADDITIONAL'
 )
 
-
 msg15_code_map = {0: 'Bypass Filter', 1: 'Bypass map in Control', 2: 'Force Filter'}

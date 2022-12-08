@@ -15,7 +15,7 @@ otherwise noted.
 """
 from collections import namedtuple
 
-from ..utils import NamedStruct, scaler, angle, BitField
+from ..utils import NamedStruct, scaler, angle, BitField, az_rate
 
 
 # Figure 1 in Interface Control Document for the Archive II/User
@@ -92,95 +92,196 @@ msg1_data_header = namedtuple(
     'name first_gate gate_width num_gates scale offset'
 )
 
-### TODO from metpy below, align with pyart ###
-msg5_fmt = NamedStruct([('size_hw', 'H'), ('pattern_type', 'H'),
-                        ('num', 'H'), ('num_el_cuts', 'H'),
-                        ('vcp_version', 'B'), ('clutter_map_group', 'B'),
-                        ('dop_res', 'B', BitField(None, 0.5, 1.0)),
-                        ('pulse_width', 'B', BitField('None', 'Short', 'Long')),
-                        (None, '4x'), ('vcp_sequencing', 'H'),
-                        ('vcp_supplemental_info', 'H'), (None, '2x'),
-                        ('els', None)], '>', 'VCPFmt')
+# Table XI Volume Coverage Pattern Data (Message Type 5 & 7)
+# pages 3-51 to 3-54
+msg5_fmt = NamedStruct(
+    (
+        ('msg_size', 'H'),
+        ('pattern_type', 'H'),
+        ('pattern_number', 'H'),
+        ('num_cuts', 'H'),
+        ('vcp_version', 'B'),
+        ('clutter_map_group', 'B'),
+        ('doppler_vel_res', 'B', BitField(None, 0.5, 1.0)),
+        ('pulse_width', 'B', BitField('None', 'Short', 'Long')),
+        (None, '4x'),
+        ('vcp_sequencing', 'H'),
+        ('vcp_supplemental_info', 'H'),
+        (None, '2x'),
+        ('els', None)
+    ),
+    '>',
+    'MSG_5'
+)
+msg5_elevation_fmt = NamedStruct(
+    (
+        ('elevation_angle', 'H', angle),
+        ('channel_config', 'B', Enum('Constant Phase', 'Random Phase', 'SZ2 Phase')),
+        (
+            'waveform',
+            'B',
+            Enum(
+                'None',
+                'Contiguous Surveillance',
+                'Contig. Doppler with Ambiguity Res.',
+                'Contig. Doppler without Ambiguity Res.',
+                'Batch',
+                'Staggered Pulse Pair'
+            )
+        ),
+        (
+            'super_resolution',
+            'B',
+            BitField(
+                '0.5 azimuth and 0.25km range res.',
+                'Doppler to 300km',
+                'Dual Polarization Control',
+                'Dual Polarization to 300km'
+            )
+        ),
+        ('prf_number', 'B'),
+        ('prf_pulse_count', 'H'),
+        ('azimuth_rate', 'H', az_rate),  # TODO metpy has 'h'?
+        ('ref_thresh', 'h', scaler(0.125)),
+        ('vel_thresh', 'h', scaler(0.125)),
+        ('sw_thresh', 'h', scaler(0.125)),
+        ('zdr_thres', 'h', scaler(0.125)),
+        ('phi_thres', 'h', scaler(0.125)),
+        ('rho_thres', 'h', scaler(0.125)),
+        ('edge_angle_1', 'H', angle),
+        ('dop_prf_num_1', 'H'),
+        ('dop_prf_pulse_count_1', 'H'),
+        ('spare_1', 'H'),
+        ('edge_angle_2', 'H', angle),
+        ('dop_prf_num_2', 'H'),
+        ('dop_prf_pulse_count_2', 'H'),
+        ('spare_2', 'H'),
+        ('edge_angle_3', 'H', angle),
+        ('dop_prf_num_3', 'H'),
+        ('dop_prf_pulse_count_3', 'H'),
+        ('spare_3', 'H')
+    ),
+    '>',
+    'MSG_5_ELEV'
+)
 
-msg5_elevation_fmt = NamedStruct([('el_angle', 'H', angle),
-                            ('channel_config', 'B', Enum('Constant Phase', 'Random Phase',
-                                                        'SZ2 Phase')),
-                            ('waveform', 'B', Enum('None', 'Contiguous Surveillance',
-                                                    'Contig. Doppler with Ambiguity Res.',
-                                                    'Contig. Doppler without Ambiguity Res.',
-                                                    'Batch', 'Staggered Pulse Pair')),
-                            ('super_res', 'B', BitField('0.5 azimuth and 0.25km range res.',
-                                                        'Doppler to 300km',
-                                                        'Dual Polarization Control',
-                                                        'Dual Polarization to 300km')),
-                            ('surv_prf_num', 'B'), ('surv_pulse_count', 'H'),
-                            ('az_rate', 'h', az_rate),
-                            ('ref_thresh', 'h', scaler(0.125)),
-                            ('vel_thresh', 'h', scaler(0.125)),
-                            ('sw_thresh', 'h', scaler(0.125)),
-                            ('zdr_thresh', 'h', scaler(0.125)),
-                            ('phidp_thresh', 'h', scaler(0.125)),
-                            ('rhohv_thresh', 'h', scaler(0.125)),
-                            ('sector1_edge', 'H', angle),
-                            ('sector1_doppler_prf_num', 'H'),
-                            ('sector1_pulse_count', 'H'), ('supplemental_data', 'H'),
-                            ('sector2_edge', 'H', angle),
-                            ('sector2_doppler_prf_num', 'H'),
-                            ('sector2_pulse_count', 'H'), ('ebc_angle', 'H', angle),
-                            ('sector3_edge', 'H', angle),
-                            ('sector3_doppler_prf_num', 'H'),
-                            ('sector3_pulse_count', 'H'), (None, '2x')], '>', 'VCPEl')
 
+# Table XVII Digital Radar Generic Format Blocks (Message Type 31)
+# pages 3-87 to 3-89
+msg31_data_header_fmt = NamedStruct(
+    (
+        ('id', '4s'),  # 0-3
+        ('collect_ms', 'L'),  # 4-7
+        ('collect_date', 'H'),  # 8-9
+        ('azimuth_number', 'H'),  # 10-11
+        ('azimuth_angle', 'f'),  # 12-15
+        ('compress_flag', 'B'),  # 16
+        (None, 'x'),  # 17
+        ('radial_length', 'H'),  # 18-19
+        ('azimuth_spacing', 'B', Enum(0, 0.5, 1.0)),  # 20
+        ('radial_spacing', 'B', remap_status),  # 21
+        ('elevation_number', 'B'),  # 22
+        ('cut_sector', 'B'),  # 23
+        ('elevation_angle', 'f'),  # 24-27
+        ('radial_blanking', 'B', BitField('Radial', 'Elevation', 'Volume')),  # 28
+        ('azimuth_mode', 'b', scaler(0.01)),  # TODO metpy has 'B'?  # 29
+        ('block_count', 'H')  # 30-31
+        # skipping block_pointer_* from PyART (32-67); handled in _decode_msg31
+    ),
+    '>',
+    'MSG_31'
+)
+# Table XVII-E Data Block (Volume Data Constant Type)
+# page 3-92
+msg31_volume_constant_fmt = NamedStruct(
+    (
+        ('block_type', 's'),
+        ('data_name', '3s'),
+        ('lrtup', 'H'),
+        ('version_major', 'B'),
+        ('version_minor', 'B'),
+        ('lat', 'f'),
+        ('lon', 'f'),
+        ('height', 'h'),
+        ('feedhorn_height', 'H'),
+        ('refl_calib', 'f'),
+        ('power_h', 'f'),
+        ('power_v', 'f'),
+        ('diff_refl_calib', 'f'),
+        ('init_phase', 'f'),
+        ('vcp', 'H'),
+        ('processing_status', 'H', BitField('RxR Noise', 'CBT'))
+    ),
+    '>',
+    'VOLUME_DATA_BLOCK'
+)
+# Table XVII-F Data Block (Elevation Data Constant Type)
+# page 3-93
+msg31_elevation_constant_fmt = NamedStruct(
+    (
+        ('block_type', 's'),
+        ('data_name', '3s'),
+        ('lrtup', 'H'),
+        ('atmos', 'h', scaler(0.001)),
+        ('refl_calib', 'f')
+    ),
+    '>',
+    'ELEVATION_DATA_BLOCK'
+)
+# Table XVII-H Data Block (Radial Data Constant Type)
+# pages 3-93
+radial_constant_fmt_v1 = NamedStruct(
+    (
+        ('block_type', 's'),
+        ('data_name', '3s'),
+        ('lrtup', 'H'),
+        ('unambig_range', 'h', scaler(100)),  # TODO metpy has 'H'?
+        ('noise_h', 'f'),
+        ('noise_v', 'f'),
+        ('nyquist_vel', 'h', scaler(0.01)),  # TODO metpy has 'H'?
+        (None, '2x')
+    ),
+    '>',
+    'RADIAL_DATA_BLOCK'
+)
+radial_constant_fmt_v2 = NamedStruct(
+    (
+        ('block_type', 's'),
+        ('data_name', '3s'),
+        ('lrtup', 'H'),
+        ('unambig_range', 'H', scaler(100)),
+        ('noise_h', 'f'),
+        ('noise_v', 'f'),
+        ('nyquist_vel', 'H', scaler(0.01)),
+        (None, '2x'),
+        ('refl_calib_h', 'f'),
+        ('refl_calib_v', 'f')
+    ),
+    '>',
+    'RADIAL_DATA_BLOCK_V2'
+)
+# Table XVII-B Data Block (Descriptor of Generic Data Moment Type)
+# pages 3-90 and 3-91
+data_block_fmt = NamedStruct(
+    (
+        ('block_type', 's'),
+        ('data_name', '3s'),  # VEL, REF, SW, RHO, PHI, ZDR
+        ('reserved', 'L'),
+        ('ngates', 'H'),
+        ('first_gate', 'h'),  # TODO metpy has 'H'?
+        ('gate_spacing', 'h'),  # TODO metpy has 'H'?
+        ('thresh', 'h', scaler(0.1)),  # TODO metpy has 'H'?
+        ('snr_thres', 'h', scaler(0.1)),
+        ('flags', 'B', BitField('Azimuths', 'Gates')),
+        ('word_size', 'B'),
+        ('scale', 'f'),
+        ('offset', 'f')
+    ),
+    '>',
+    'GENERIC_DATA_BLOCK'
+)
 
-
-msg31_data_header_fmt = NamedStruct([('stid', '4s'), ('time_ms', 'L'),
-                                    ('date', 'H'), ('az_num', 'H'),
-                                    ('az_angle', 'f'), ('compression', 'B'),
-                                    (None, 'x'), ('rad_length', 'H'),
-                                    ('az_spacing', 'B', Enum(0, 0.5, 1.0)),
-                                    ('rad_status', 'B', remap_status),
-                                    ('el_num', 'B'), ('sector_num', 'B'),
-                                    ('el_angle', 'f'),
-                                    ('spot_blanking', 'B', BitField('Radial', 'Elevation',
-                                                                    'Volume')),
-                                    ('az_index_mode', 'B', scaler(0.01)),
-                                    ('num_data_blks', 'H')], '>', 'Msg31DataHdr')
-
-msg31_volume_constant_fmt = NamedStruct([('type', 's'), ('name', '3s'),
-                                    ('size', 'H'), ('major', 'B'),
-                                    ('minor', 'B'), ('lat', 'f'), ('lon', 'f'),
-                                    ('site_amsl', 'h'), ('feedhorn_agl', 'H'),
-                                    ('calib_dbz', 'f'), ('txpower_h', 'f'),
-                                    ('txpower_v', 'f'), ('sys_zdr', 'f'),
-                                    ('phidp0', 'f'), ('vcp', 'H'),
-                                    ('processing_status', 'H', BitField('RxR Noise',
-                                                                        'CBT'))],
-                                    '>', 'VolConsts')
-
-msg31_elevation_constant_fmt = NamedStruct([('type', 's'), ('name', '3s'),
-                                    ('size', 'H'), ('atmos_atten', 'h', scaler(0.001)),
-                                    ('calib_dbz0', 'f')], '>', 'ElConsts')
-
-radial_constant_fmt_v1 = NamedStruct([('type', 's'), ('name', '3s'), ('size', 'H'),
-                                ('unamb_range', 'H', scaler(0.1)),
-                                ('noise_h', 'f'), ('noise_v', 'f'),
-                                ('nyq_vel', 'H', scaler(0.01)),
-                                (None, '2x')], '>', 'RadConstsV1')
-radial_constant_fmt_v2 = NamedStruct([('type', 's'), ('name', '3s'), ('size', 'H'),
-                                ('unamb_range', 'H', scaler(0.1)),
-                                ('noise_h', 'f'), ('noise_v', 'f'),
-                                ('nyq_vel', 'H', scaler(0.01)),
-                                (None, '2x'), ('calib_dbz0_h', 'f'),
-                                ('calib_dbz0_v', 'f')], '>', 'RadConstsV2')
-
-data_block_fmt = NamedStruct([('type', 's'), ('name', '3s'),
-                                ('reserved', 'L'), ('num_gates', 'H'),
-                                ('first_gate', 'H', scaler(0.001)),
-                                ('gate_width', 'H', scaler(0.001)),
-                                ('tover', 'H', scaler(0.1)),
-                                ('snr_thresh', 'h', scaler(0.1)),
-                                ('recombined', 'B', BitField('Azimuths', 'Gates')),
-                                ('data_size', 'B'),
-                                ('scale', 'f'), ('offset', 'f')], '>', 'DataBlockHdr')
-
-Radial = namedtuple('Radial', 'header vol_consts elev_consts radial_consts moments')
+Radial = namedtuple(
+    'Radial',
+    'header volume_consts elevation_consts radial_consts moments'
+)

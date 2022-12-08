@@ -63,6 +63,11 @@ def angle(val):
     return val * 360. / 2**16
 
 
+def az_rate(val):
+    """Convert an integer value to a floating point angular rate."""
+    return val * 90. / 2**16
+
+
 def remap_status(val):
     """Convert status integer value to appropriate bitmask."""
     status = 0
